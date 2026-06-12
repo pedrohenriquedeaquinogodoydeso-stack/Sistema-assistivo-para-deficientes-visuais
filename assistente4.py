@@ -7,6 +7,10 @@ import pyttsx3
 import pyperclip
 import win32gui
 import os
+import requests
+
+
+
 
 # CONFIGURAÇÕES DE CAMINHOS
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -232,6 +236,15 @@ def pesquisar():
     keyboard.write(q)
     keyboard.press_and_release('enter')
 
+def pegar_clima(cidade): #PRECISA DE INTERNEt
+    base_url = f"https://wttr.in/{cidade}?format=%C+%t"
+    response = requests.get(base_url)
+
+    if response.status_code == 200:
+        return response.text.strip()
+    else:
+        return "Não foi possível pegar as informações. Verifique a cidade e a conexão."
+
 # =========================
 # LOOP PRINCIPAL
 # =========================
@@ -246,6 +259,11 @@ while True:
 
         elif "clicar" in comando or "clica" in comando or "pausa" in comando or "despausa" in comando:
             click()
+        elif "clima" in comando or "temperatura" in comando:
+            falar("De qual cidade você quer saber o clima?")
+            cidade = ouvir_comando()
+            falar(pegar_clima(cidade))
+
 
         elif "hora" in comando:
             exibir_hora()
@@ -405,56 +423,82 @@ while True:
                 frase_completa = ""
             elif keyboard.is_pressed('A'):
                 falar("A")
+                palavra_atual += "A"
             elif keyboard.is_pressed('B'):
                 falar("B")
+                palavra_atual += "B"
             elif keyboard.is_pressed('C'):
                 falar("C")
+                palavra_atual += "C"
             elif keyboard.is_pressed('D'):
                 falar("D")
+                palavra_atual += "D"
             elif keyboard.is_pressed('E'):
                 falar("E")
+                palavra_atual += "E"
             elif keyboard.is_pressed('F'):
                 falar("F")
+                palavra_atual += "F"
             elif keyboard.is_pressed('G'):
                 falar("G")
+                palavra_atual += "G"
             elif keyboard.is_pressed('H'):
                 falar("H")
+                palavra_atual += "H"
             elif keyboard.is_pressed('I'):
                 falar("I")
+                palavra_atual += "I"
             elif keyboard.is_pressed('J'):
                 falar("J")
+                palavra_atual += "J"
             elif keyboard.is_pressed('K'):
                 falar("K")
+                palavra_atual += "K"
             elif keyboard.is_pressed('L'):
                 falar("L")
+                palavra_atual += "L"
             elif keyboard.is_pressed('M'):
                 falar("M")
+                palavra_atual += "M"
             elif keyboard.is_pressed('N'):
                 falar("N")
+                palavra_atual += "N"
             elif keyboard.is_pressed('O'):
                 falar("O")
+                palavra_atual += "O"
             elif keyboard.is_pressed('P'):
                 falar("P")
+                palavra_atual += "P"
             elif keyboard.is_pressed('Q'):
                 falar("Q")
+                palavra_atual += "Q"
             elif keyboard.is_pressed('R'):
                 falar("R")
+                palavra_atual += "R"
             elif keyboard.is_pressed('S'):
                 falar("S")
+                palavra_atual += "S"
             elif keyboard.is_pressed('T'):
                 falar("T")
+                palavra_atual += "T"
             elif keyboard.is_pressed('U'):
                 falar("U")
+                palavra_atual += "U"
             elif keyboard.is_pressed('V'):
                 falar("V")
+                palavra_atual += "V"
             elif keyboard.is_pressed('W'):
                 falar("W")
+                palavra_atual += "W"
             elif keyboard.is_pressed('X'):
                 falar("X")
+                palavra_atual += "X"
             elif keyboard.is_pressed('Y'):
                 falar("Y")
+                palavra_atual += "Y"
             elif keyboard.is_pressed('Z'):
                 falar("Z")
+                palavra_atual += "Z"
             elif keyboard.is_pressed('esc'):
                 falar("Saindo do modo ditar")
                 mode = "normal"
