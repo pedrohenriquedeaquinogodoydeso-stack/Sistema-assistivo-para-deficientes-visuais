@@ -8,25 +8,71 @@ import pyperclip
 import win32gui
 import os
 import requests
+import pygame
+pygame.init()
+from google import genai
+from google.genai import errors
+import pywhatkit as kit
 
 
+data_atual = datetime.datetime.now()
 
 
 # CONFIGURAÇÕES DE CAMINHOS
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SAVE_NOMES_PATH = os.path.join(BASE_DIR, 'save_nomes.txt')
 SAVE_VIDEOS_PATH = os.path.join(BASE_DIR, 'save_videos.txt')
-
+YOUTUBE_SEARCH = "youtube.com/results?search_query="
 # =========================
 # CONFIG
 # =========================
 tasks = ""
 ex_mode = "normal"  # normal, youtube
-mode = "normal"  # normal, narrador, tarefas, ditar, youtube, seleção, shorts, vídeo
+mode = "normal"
+# Modos: normal, narrador, tarefas, ditar, youtube, seleção, shorts, vídeo
 
 # =========================
 # VOZ - usando pyttsx3
 # =========================
+def mensagem():
+    global data_atual
+    falar("Digite o número completo")
+    numero = input("Digite o seu número (com DDD): ")
+    falar("Qual a sua mensagem?")
+    keyboard.wait('space')
+    som = pygame.mixer.Sound("beep.mp3")
+    som.play()
+    mensagem = str(ouvir_comando())
+    kit.sendwhatmsg(numero, mensagem, data_atual.hour, data_atual.minute + 2)
+
+
+def ia():
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        falar("Configure a variável de ambiente GEMINI_API_KEY para usar a inteligência artificial.")
+        return
+
+    client = genai.Client(api_key=api_key)
+    falar("Diga sua pergunta: ")
+    pergunta = ouvir_comando().strip()
+    if not pergunta:
+        falar("Não consegui identificar sua pergunta.")
+        return
+
+    chat = client.chats.create(model="gemini-3.5-flash")
+    for tentativa in range(3):
+        try:
+            response = chat.send_message(message=pergunta)
+            print("Resposta da IA:", response.text)
+            falar(response.text)
+            return
+        except errors.ServerError as erro:
+            if erro.code != 503 or tentativa == 2:
+                falar("A inteligência artificial está indisponível no momento. Tente novamente mais tarde.")
+                return
+            time.sleep(2 ** (tentativa + 1))
+
+
 def falar(texto):
     try:
         engine = pyttsx3.init()
@@ -36,15 +82,26 @@ def falar(texto):
     except Exception as e:
         print(f"Erro ao falar: {e}")
 
+
 # =========================
 # OUVIR COMANDO
 # =========================
-def ouvir_comando():
+def ouvir_comando(pressionar_espaco=False):
     r = sr.Recognizer()
     with sr.Microphone() as source:
         print("Diga o comando...")
         try:
-            audio = r.listen(source, timeout=5, phrase_time_limit=5)
+            if pressionar_espaco:
+                blocos_audio = []
+                while keyboard.is_pressed('space'):
+                    blocos_audio.append(source.stream.read(source.CHUNK))
+                if not blocos_audio:
+                    return ""
+                audio = sr.AudioData(
+                    b"".join(blocos_audio), source.SAMPLE_RATE, source.SAMPLE_WIDTH
+                )
+            else:
+                audio = r.listen(source, timeout=5, phrase_time_limit=5)
         except sr.WaitTimeoutError:
             print("Nenhum som detectado.")
             return ""
@@ -53,13 +110,15 @@ def ouvir_comando():
         comando = r.recognize_google(audio, language='pt-BR')
         print("Você disse:", comando)
         return comando.lower()
-    except:
+    except sr.UnknownValueError:
         print("Erro ao reconhecer.")
         return ""
 
 # =========================
 # FUNÇÕES DE VÍDEO
 # =========================
+
+
 def salvar_video():
     falar("Qual nome deseja salvar o vídeo?")
     comando = ouvir_comando().strip()
@@ -83,6 +142,7 @@ def salvar_video():
         save_video.write(texto + '\n')
 
     falar('vídeo salvo')
+
 
 def carregar_video():
     falar("Qual vídeo você deseja carregar?")
@@ -128,13 +188,17 @@ def carregar_video():
 # =========================
 # FUNÇÕES PRINCIPAIS
 # =========================
+
+
 def click():
     pg.click()
+
 
 def escrever():
     falar("O que deseja escrever?")
     texto = ouvir_comando()
     keyboard.write(texto)
+
 
 def abrir():
     falar("O que deseja abrir?")
@@ -146,9 +210,11 @@ def abrir():
     keyboard.press_and_release('enter')
     falar(f"Abrindo {app}")
 
+
 def exibir_hora():
     hora = datetime.datetime.now().strftime("%H:%M")
     falar(f"São {hora} agora")
+
 
 def volume():
     falar("Aumentar, diminuir ou mutar?")
@@ -168,8 +234,11 @@ def volume():
 # =========================
 # NARRADOR / TELA
 # =========================
+
+
 def narrador():
     keyboard.press_and_release('win+ctrl+enter')
+
 
 def ler_selecao():
     pg.hotkey('ctrl', 'c')
@@ -180,6 +249,7 @@ def ler_selecao():
         falar(texto[:500])
     else:
         falar("Nada selecionado")
+
 
 def janela_ativa():
     hwnd = win32gui.GetForegroundWindow()
@@ -193,6 +263,8 @@ def janela_ativa():
 # =========================
 # TAREFAS
 # =========================
+
+
 def adicionar_tarefa():
     global tasks
     falar("Qual tarefa deseja adicionar?")
@@ -202,11 +274,13 @@ def adicionar_tarefa():
         tasks += t + "\n"
         falar("Tarefa adicionada")
 
+
 def listar_tarefas():
     if tasks.strip():
         falar(tasks)
     else:
         falar("Você não tem tarefas")
+
 
 def remover_tarefa():
     global tasks
@@ -222,6 +296,8 @@ def remover_tarefa():
 # =========================
 # PESQUISAR
 # =========================
+
+
 def pesquisar():
     falar("O que deseja pesquisar?")
     q = ouvir_comando()
@@ -236,34 +312,43 @@ def pesquisar():
     keyboard.write(q)
     keyboard.press_and_release('enter')
 
-def pegar_clima(cidade): #PRECISA DE INTERNEt
+
+def pegar_clima(cidade):  # PRECISA DE INTERNEt
     base_url = f"https://wttr.in/{cidade}?format=%C+%t"
     response = requests.get(base_url)
 
     if response.status_code == 200:
         return response.text.strip()
     else:
-        return "Não foi possível pegar as informações. Verifique a cidade e a conexão."
+        return "Não foi possível pegar as informações. " \
+            "Verifique a cidade e a conexão."
 
 # =========================
 # LOOP PRINCIPAL
 # =========================
-falar("Assistente iniciado com pyttsx3")
+
+
+falar("Assistente iniciando, Aperte espaço para gravar um comando")
+
+
 print("Assistente rodando...")
 
 while True:
-    comando = ouvir_comando()
+    keyboard.wait('space')
+    som = pygame.mixer.Sound("beep.mp3")
+    som.play()
+    #toca o beep
+    comando = ouvir_comando(pressionar_espaco=True)
+    lclicar = ["clicar", "clica", "pausa", "despausa"]
     if mode == "normal":
         if not comando:
             continue
-
-        elif "clicar" in comando or "clica" in comando or "pausa" in comando or "despausa" in comando:
+        elif any(palavra in comando for palavra in lclicar):
             click()
         elif "clima" in comando or "temperatura" in comando:
             falar("De qual cidade você quer saber o clima?")
             cidade = ouvir_comando()
             falar(pegar_clima(cidade))
-
 
         elif "hora" in comando:
             exibir_hora()
@@ -279,11 +364,11 @@ while True:
 
         elif "pesquisar" in comando:
             pesquisar()
-        
+
         elif "ler tudo" in comando:
             keyboard.press_and_release('ctrl+a')
             ler_selecao()
-        
+
         elif "ler tela" in comando or "narrador" in comando:
             falar("Ativando narrador")
             narrador()
@@ -299,14 +384,14 @@ while True:
 
         elif "ver tarefas" in comando or "missões" in comando:
             listar_tarefas()
-        
+
         elif "ditar" in comando:
             falar("ATIVANDO MODO DITADO")
             mode = "ditar"
-        
+
         elif "remover tarefa" in comando:
             remover_tarefa()
-        
+
         elif "youtube" in comando:
             keyboard.press_and_release('win')
             time.sleep(0.5)
@@ -320,44 +405,55 @@ while True:
             ex_mode = mode
             mode = "youtube"
             falar("Você está na página inicial do YouTube")
-            falar("Diga comandos para mais comandos relacionados ao YouTube, ou diga 'sair' para voltar ao modo normal")
-        
+            metade = "Diga comandos para mais comandos relacionados ao YouTube"
+            falar(metade + " ou diga 'sair' para voltar ao modo normal")
+
         elif "sair" in comando or "parar" in comando:
             falar("Encerrando assistente")
             raise SystemExit
-    
+        elif "ia" in comando or "inteligência artificial" in comando:
+            ia()
+        elif "mensagem" in comando or "whatsapp" in comando:
+            mensagem()
     elif mode == "youtube":
         if "comandos" in comando:
             falar("Comandos disponíveis: pesquisar, vídeos curtos, sair")
-        
+
         elif "carregar vídeo" in comando:
             carregar_video()
-        
+
         elif "pesquisar" in comando:
             falar("O que deseja pesquisar no YouTube?")
             q = ouvir_comando()
             keyboard.press_and_release('ctrl+l')
             time.sleep(0.5)
-            keyboard.write("youtube.com/results?search_query=" + q.replace(" ", "+"))
+            keyboard.write(YOUTUBE_SEARCH + q.replace(" ", "+"))
             keyboard.press_and_release('enter')
             ex_mode = mode
             falar("entrando no modo seleção de vídeos")
-            falar("Diga 'próximo' ou 'anterior' para navegar, e 'selecionar' para abrir o vídeo. Diga 'sair' para voltar ao modo normal")
+            metade = "Diga 'próximo' ou 'anterior' para navegar e 'selecionar'"
+            metade2 = " para abrir o vídeo. Diga 'sair' para voltar ao"
+            falar(metade + metade2 + " modo normal")
             mode = "seleção"
             keyboard.press_and_release('ctrl+windows+enter')
-        
-        elif "curtos" in comando or "vídeos curtos" in comando or "shorts" in comando:
+
+        elif "curtos" in comando or "vídeos curtos" in comando:
             keyboard.press_and_release('ctrl+l')
             time.sleep(0.5)
             keyboard.write("youtube.com/shorts")
             keyboard.press_and_release('enter')
             falar("Entrando no modo shorts")
             mode = "shorts"
-
+        elif "fechar" in comando:
+            falar("Voltando ao modo normal")
+            keyboard.press_and_release('ctrl+shift+a')
+            keyboard.write('YouTube')
+            keyboard.press_and_release('enter')
+            keyboard.press_and_release('ctrl+w')
+            #Volta para o vscode
         elif "sair" in comando or "parar" in comando:
             mode = "normal"
             falar("Voltando ao modo normal")
-    
     elif mode == "seleção":
         if "próximo" in comando:
             keyboard.press_and_release('tab')
@@ -378,14 +474,16 @@ while True:
             elif ex_mode == "normal":
                 mode = "normal"
                 falar("Voltando ao modo normal")
-    
+
     elif mode == "shorts":
         if "próximo" in comando:
             keyboard.press_and_release('down')
         elif "salvar vídeo" in comando:
             salvar_video()
         elif "comandos" in comando:
-            falar("Comandos disponíveis: próximo, anterior, pause, salvar vídeo, sair")
+            metade = "Comandos disponíveis: "
+            dastring = "próximo, anterior, pause, salvar vídeo, sair"
+            falar(metade + dastring)
         elif "anterior" in comando:
             keyboard.press_and_release('up')
         elif "pause" in comando:
@@ -393,7 +491,11 @@ while True:
         elif "sair" in comando or "parar" in comando:
             mode = "youtube"
             falar("Voltando ao modo YouTube")
-    
+            keyboard.press_and_release('ctrl+l')
+            time.sleep(0.5)
+            keyboard.write("youtube.com/")
+            keyboard.press_and_release('enter')
+            falar("voltando para a página inicial do YouTube")
     elif mode == "vídeo":
         if "pausar" in comando or "pause" in comando:
             keyboard.press_and_release('space')
@@ -402,14 +504,18 @@ while True:
         elif "salvar vídeo" in comando:
             salvar_video()
         elif "sair" in comando or "parar" in comando:
+            keyboard.press_and_release('ctrl+l')
+            time.sleep(0.5)
+            keyboard.write("youtube.com/")
+            keyboard.press_and_release('enter')
             mode = "seleção"
             falar("Voltando ao modo seleção de vídeos")
-    
+
     elif mode == "ditar":
         falar("Esc para sair do modo ditar")
         palavra_atual = ""
         frase_completa = ""
-        
+
         while mode == "ditar":
             if keyboard.is_pressed('backspace'):
                 palavra_atual = palavra_atual[:-1]
@@ -502,4 +608,3 @@ while True:
             elif keyboard.is_pressed('esc'):
                 falar("Saindo do modo ditar")
                 mode = "normal"
-
